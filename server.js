@@ -21,45 +21,58 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// GİRİŞ PANELİ (Sadece logon ve giriş formu)
+// ORTAK TASARIM (Hem giriş hem yükleme için şablon)
+const renderPage = (content) => `
+    <html>
+    <head>
+        <style>
+            body { background: #fafafa; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; border-radius: 3px; }
+            .logo { font-size: 1.8em; font-weight: bold; color: #333; margin-bottom: 25px; }
+            input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #dbdbdb; box-sizing: border-box; border-radius: 3px; }
+            button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; border-radius: 3px; }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="logo">Resul Müzik Mix Panel</div>
+            ${content}
+        </div>
+    </body>
+    </html>
+`;
+
+// GİRİŞ PANELİ
 app.get('/', (req, res) => {
-    res.send(`
-        <html>
-        <head>
-            <style>
-                body { background: #fafafa; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                .login-card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; border-radius: 3px; }
-                .logo { font-size: 1.8em; font-weight: bold; color: #333; margin-bottom: 25px; }
-                input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #dbdbdb; box-sizing: border-box; border-radius: 3px; }
-                button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; border-radius: 3px; }
-            </style>
-        </head>
-        <body>
-            <div class="login-card">
-                <div class="logo">Resul Müzik Mix Panel</div>
-                <form action="/login" method="POST">
-                    <input type="text" name="user" placeholder="Kullanıcı Adı">
-                    <input type="password" name="pass" placeholder="Şifre">
-                    <button type="submit">Giriş Yap</button>
-                </form>
-            </div>
-        </body>
-        </html>
-    `);
+    res.send(renderPage(`
+        <form action="/login" method="POST">
+            <input type="text" name="user" placeholder="Kullanıcı Adı">
+            <input type="password" name="pass" placeholder="Şifre">
+            <button type="submit">Giriş Yap</button>
+        </form>
+    `));
 });
 
+// GİRİŞ İŞLEMİ
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
     if (kullanicilar[user] && kullanicilar[user] === pass) {
-        res.send(`<html><body style="padding:20px; font-family:sans-serif;"><h3>Resim Yükle</h3><form action="/upload" method="POST" enctype="multipart/form-data"><input type="hidden" name="user" value="${user}"><input type="file" name="resim" required><br><br><button type="submit">Yükle</button></form></body></html>`);
-    } else { res.send("Hatalı Giriş!"); }
+        res.send(renderPage(`
+            <form action="/upload" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="user" value="${user}">
+                <input type="file" name="resim" required style="border:none;">
+                <button type="submit">Resmi Yükle</button>
+            </form>
+        `));
+    } else { res.send(renderPage("Hatalı Giriş!")); }
 });
 
+// YÜKLEME İŞLEMİ
 app.post('/upload', upload.single('resim'), (req, res) => {
-    res.send("Başarıyla Yüklendi! <br><br> <a href='/'>Geri dön</a>");
+    res.send(renderPage("Başarıyla Yüklendi! <br><br> <a href='/'>Geri dön</a>"));
 });
 
-// OBS EKRANI (JS ile Garantili Otomatik Yenileme)
+// OBS EKRANI
 app.get('/son-resim/:user', (req, res) => {
     const user = req.params.user;
     const dir = 'public/uploads';

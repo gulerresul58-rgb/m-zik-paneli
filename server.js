@@ -17,7 +17,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// ORTAK TASARIM ŞABLONU (Tüm sayfalar aynı kutunun içinde)
 const renderPage = (content) => `
     <html>
     <head>
@@ -27,7 +26,6 @@ const renderPage = (content) => `
             .logo { font-size: 1.8em; font-weight: bold; color: #333; margin-bottom: 25px; }
             input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #dbdbdb; box-sizing: border-box; border-radius: 3px; }
             button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; border-radius: 3px; }
-            a { color: #0095f6; text-decoration: none; font-weight: bold; }
         </style>
     </head>
     <body>
@@ -39,7 +37,6 @@ const renderPage = (content) => `
     </html>
 `;
 
-// GİRİŞ SAYFASI
 app.get('/', (req, res) => {
     res.send(renderPage(`
         <form action="/login" method="POST">
@@ -50,26 +47,23 @@ app.get('/', (req, res) => {
     `));
 });
 
-// YÜKLEME SAYFASI (Giriş yapınca bu görünecek)
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
     if (kullanicilar[user] && kullanicilar[user] === pass) {
         res.send(renderPage(`
             <form action="/upload" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="user" value="${user}">
-                <input type="file" name="resim" required style="border:none; margin-bottom:10px;">
+                <input type="file" name="resim" required><br>
                 <button type="submit">Resmi Yükle</button>
             </form>
         `));
     } else { res.send(renderPage("Hatalı Giriş!")); }
 });
 
-// YÜKLEME SONUCU
 app.post('/upload', upload.single('resim'), (req, res) => {
     res.send(renderPage("Başarıyla Yüklendi! <br><br> <a href='/'>Geri dön</a>"));
 });
 
-// OBS EKRANI
 app.get('/son-resim/:user', (req, res) => {
     const filePath = path.join(uploadDir, req.params.user + '_son.jpg');
     if (fs.existsSync(filePath)) {

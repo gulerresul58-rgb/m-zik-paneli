@@ -1,36 +1,48 @@
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
 const app = express();
-const upload = multer({ dest: 'public/uploads/' });
-
-app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 
-// Giriş Ekranı
+// Tasarım kodları (CSS)
+const style = `
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #fafafa; margin: 0; }
+        .card { background: white; padding: 40px; border: 1px solid #dbdbdb; border-radius: 5px; width: 300px; text-align: center; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #dbdbdb; border-radius: 3px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        h1 { font-family: cursive; margin-bottom: 30px; }
+    </style>
+`;
+
+// 1. Giriş Sayfası (Tema Ekli)
 app.get('/', (req, res) => {
-    res.send(`<h1>Giriş</h1><form action="/login" method="POST"><input type="text" name="user"><input type="password" name="pass"><button>Giriş</button></form>`);
+    res.send(`
+        <html><head>${style}</head><body>
+        <div class="card">
+            <h1>M-Zik</h1>
+            <form action="/login" method="POST">
+                <input type="text" name="user" placeholder="Kullanıcı adı" required>
+                <input type="password" name="pass" placeholder="Şifre" required>
+                <button type="submit">Giriş Yap</button>
+            </form>
+        </div></body></html>
+    `);
 });
 
-// Resim Yükleme Paneli
+// 2. Panel (Giriş sonrası görünen kısım)
 app.post('/login', (req, res) => {
     if(req.body.user === "yayin1" && req.body.pass === "1234") {
-        res.send(`<h1>Resim Yükle</h1>
-        <form action="/upload" method="POST" enctype="multipart/form-data">
-        <input type="file" name="resim">
-        <button type="submit">Yükle</button></form>`);
+        res.send(`
+            <html><head>${style}</head><body>
+            <div class="card">
+                <h2>Panel</h2>
+                <p>Resim Linki Yükle:</p>
+                <form action="/guncelle" method="POST">
+                    <input type="text" name="yeniLink" placeholder="Link buraya...">
+                    <button type="submit">Güncelle</button>
+                </form>
+            </div></body></html>
+        `);
     } else { res.send("Hatalı giriş!"); }
-});
-
-// Dosyayı Kaydet
-app.post('/upload', upload.single('resim'), (req, res) => {
-    res.send("Yüklendi! Artık OBS'ten görebilirsin.");
-});
-
-// OBS'in Çekeceği Link
-app.get('/overlay/yayin1', (req, res) => {
-    // Burada son yüklenen resim gösterilecek
-    res.send(`<h1>OBS Ekranı</h1><img src="/uploads/${req.file ? req.file.filename : ''}" style="width:100%;">`);
 });
 
 app.listen(10000);

@@ -12,7 +12,7 @@ const kullanicilar = {
     "yayin2": "5678"
 };
 
-// Dosya ismini her seferinde değişecek şekilde (zaman damgalı) ayarlar
+// Dosyaları kaydederken benzersiz olması için zaman damgası ekliyoruz
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = 'public/uploads';
@@ -32,7 +32,6 @@ const style = `<style>
     button { width: 100%; padding: 12px; background: #0095f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
 </style>`;
 
-// Giriş Sayfası
 app.get('/', (req, res) => {
     res.send(`<html><head>${style}</head><body><div class="card">
         <h2>Resul Müzik Mix Panel</h2>
@@ -43,7 +42,6 @@ app.get('/', (req, res) => {
         </form></div></body></html>`);
 });
 
-// Giriş Kontrolü
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
     if (kullanicilar[user] && kullanicilar[user] === pass) {
@@ -60,7 +58,6 @@ app.post('/login', (req, res) => {
     }
 });
 
-// Yükleme İşlemi
 app.post('/upload', upload.single('resim'), (req, res) => {
     res.send(`<html><head>${style}</head><body><div class="card">
         <h2>Resul Müzik Mix Panel</h2>
@@ -68,20 +65,22 @@ app.post('/upload', upload.single('resim'), (req, res) => {
         <a href="/">Panele Dön</a></div></body></html>`);
 });
 
-// OBS İÇİN ÖNEMLİ: Son yüklenen dosyayı otomatik bulan sistem
+// OBS'in önbelleği aşması için en son yüklenen dosyaya yönlendirme
 app.get('/son-resim/:user', (req, res) => {
     const user = req.params.user;
     const dir = 'public/uploads';
-    if (!fs.existsSync(dir)) return res.status(404).send('Klasör bulunamadı');
+    if (!fs.existsSync(dir)) return res.status(404).send('Klasör yok');
     
     const files = fs.readdirSync(dir);
     const userFiles = files.filter(f => f.startsWith(user + '_')).sort();
     
     if (userFiles.length > 0) {
-        // En son yüklenen (en büyük zaman damgalı) dosyayı gönder
-        res.redirect('/uploads/' + userFiles[userFiles.length - 1]);
+        const sonDosya = userFiles[userFiles.length - 1];
+        // Tarayıcıya/OBS'e "bu dosyayı asla önbelleğe alma" komutu veriyoruz
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        res.redirect('/uploads/' + sonDosya);
     } else {
-        res.status(404).send('Henüz resim yüklenmemiş.');
+        res.status(404).send('Resim yok');
     }
 });
 

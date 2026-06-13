@@ -21,14 +21,14 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// ANA GİRİŞ PANELİ
+// GİRİŞ PANELİ (Sadece logon ve giriş formu)
 app.get('/', (req, res) => {
     res.send(`
         <html>
         <head>
             <style>
                 body { background: #fafafa; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                .login-card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; }
+                .login-card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; border-radius: 3px; }
                 .logo { font-size: 1.8em; font-weight: bold; color: #333; margin-bottom: 25px; }
                 input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #dbdbdb; box-sizing: border-box; border-radius: 3px; }
                 button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; border-radius: 3px; }
@@ -48,7 +48,6 @@ app.get('/', (req, res) => {
     `);
 });
 
-// GİRİŞ İŞLEMİ
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
     if (kullanicilar[user] && kullanicilar[user] === pass) {
@@ -56,12 +55,11 @@ app.post('/login', (req, res) => {
     } else { res.send("Hatalı Giriş!"); }
 });
 
-// YÜKLEME İŞLEMİ
 app.post('/upload', upload.single('resim'), (req, res) => {
     res.send("Başarıyla Yüklendi! <br><br> <a href='/'>Geri dön</a>");
 });
 
-// OBS İÇİN GÖRÜNTÜLEME EKRANI
+// OBS EKRANI (JS ile Garantili Otomatik Yenileme)
 app.get('/son-resim/:user', (req, res) => {
     const user = req.params.user;
     const dir = 'public/uploads';
@@ -73,12 +71,16 @@ app.get('/son-resim/:user', (req, res) => {
         res.send(`
             <html>
             <head>
-                <meta http-equiv="refresh" content="1">
-                <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
                 <style>
                     body { margin: 0; padding: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
                     img { max-width: 100%; max-height: 100%; object-fit: contain; }
                 </style>
+                <script>
+                    setInterval(() => {
+                        const img = document.querySelector('img');
+                        img.src = '/uploads/${sonDosya}?t=' + new Date().getTime();
+                    }, 1000);
+                </script>
             </head>
             <body>
                 <img src="/uploads/${sonDosya}?t=${Date.now()}">

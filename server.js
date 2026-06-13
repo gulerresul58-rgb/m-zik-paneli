@@ -9,12 +9,9 @@ const uploadDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Resmi rastgele isimle kaydet ki cache'e takılmasın
 const storage = multer.diskStorage({
     destination: (req, file, cb) => { cb(null, uploadDir); },
-    filename: (req, file, cb) => { 
-        cb(null, req.body.user + '_' + Date.now() + '.jpg'); 
-    }
+    filename: (req, file, cb) => { cb(null, req.body.user + '_son.jpg'); }
 });
 const upload = multer({ storage: storage });
 
@@ -29,55 +26,35 @@ const renderPage = (content) => `
             button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; border-radius: 3px; }
         </style>
     </head>
-    <body>
-        <div class="card">
-            <div class="logo">Resul Müzik Mix Panel</div>
-            ${content}
-        </div>
-    </body>
+    <body><div class="card"><div class="logo">Resul Müzik Mix Panel</div>${content}</div></body>
     </html>
 `;
 
-app.get('/', (req, res) => {
-    res.send(renderPage(`
-        <form action="/login" method="POST">
-            <input type="text" name="user" placeholder="Kullanıcı Adı">
-            <input type="password" name="pass" placeholder="Şifre">
-            <button type="submit">Giriş Yap</button>
-        </form>
-    `));
-});
+app.get('/', (req, res) => res.send(renderPage('<form action="/login" method="POST"><input type="text" name="user" placeholder="Kullanıcı Adı"><input type="password" name="pass" placeholder="Şifre"><button type="submit">Giriş Yap</button></form>')));
 
 app.post('/login', (req, res) => {
-    const { user, pass } = req.body;
-    if (user === "yayin1" && pass === "1234") {
-        res.send(renderPage(`
-            <form action="/upload" method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="user" value="${user}">
-                <input type="file" name="resim" required><br>
-                <button type="submit">Resmi Yükle</button>
-            </form>
-        `));
+    if (req.body.user === "yayin1" && req.body.pass === "1234") {
+        res.send(renderPage('<form action="/upload" method="POST" enctype="multipart/form-data"><input type="hidden" name="user" value="yayin1"><input type="file" name="resim" required><br><button type="submit">Resmi Yükle</button></form>'));
     } else { res.send(renderPage("Hatalı!")); }
 });
 
-app.post('/upload', upload.single('resim'), (req, res) => {
-    res.send(renderPage("Yüklendi! <br><br> <a href='/'>Geri dön</a>"));
-});
+app.post('/upload', upload.single('resim'), (req, res) => res.send(renderPage("Yüklendi! <a href='/'>Geri</a>")));
 
+// TİTREMEYİ ÖNLEYEN GÜNCEL EKRAN
 app.get('/son-resim/:user', (req, res) => {
-    const files = fs.readdirSync(uploadDir).filter(f => f.startsWith(req.params.user + '_')).sort();
-    if (files.length > 0) {
-        const sonDosya = files[files.length - 1];
-        res.send(`
-            <html><head><meta http-equiv="refresh" content="1"></head>
-            <body style="margin:0; background:black; display:flex; justify-content:center; align-items:center; height:100vh;">
-                <img src="/uploads/${sonDosya}?t=${Date.now()}" style="max-width:100%; max-height:100%; object-fit:contain;">
-            </body></html>
-        `);
-    } else {
-        res.send("<h1 style='color:white; text-align:center;'>Resim bekleniyor...</h1>");
-    }
+    res.send(`
+        <html>
+        <body style="margin:0; background:black; display:flex; justify-content:center; align-items:center; height:100vh;">
+            <img id="gosterge" src="/uploads/${req.params.user}_son.jpg?t=${Date.now()}" style="max-width:100%; max-height:100%; object-fit:contain;">
+            <script>
+                setInterval(() => {
+                    var img = document.getElementById('gosterge');
+                    img.src = '/uploads/${req.params.user}_son.jpg?t=' + new Date().getTime();
+                }, 1000);
+            </script>
+        </body>
+        </html>
+    `);
 });
 
 app.listen(process.env.PORT || 10000);

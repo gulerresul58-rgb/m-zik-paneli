@@ -9,11 +9,12 @@ const uploadDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 app.use(express.static(path.join(__dirname, 'public')));
 
-const kullanicilar = { "yayin1": "1234", "yayin2": "5678" };
-
+// Resmi rastgele isimle kaydet ki cache'e takılmasın
 const storage = multer.diskStorage({
     destination: (req, file, cb) => { cb(null, uploadDir); },
-    filename: (req, file, cb) => { cb(null, req.body.user + '_son.jpg'); }
+    filename: (req, file, cb) => { 
+        cb(null, req.body.user + '_' + Date.now() + '.jpg'); 
+    }
 });
 const upload = multer({ storage: storage });
 
@@ -49,7 +50,7 @@ app.get('/', (req, res) => {
 
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
-    if (kullanicilar[user] && kullanicilar[user] === pass) {
+    if (user === "yayin1" && pass === "1234") {
         res.send(renderPage(`
             <form action="/upload" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="user" value="${user}">
@@ -57,20 +58,21 @@ app.post('/login', (req, res) => {
                 <button type="submit">Resmi Yükle</button>
             </form>
         `));
-    } else { res.send(renderPage("Hatalı Giriş!")); }
+    } else { res.send(renderPage("Hatalı!")); }
 });
 
 app.post('/upload', upload.single('resim'), (req, res) => {
-    res.send(renderPage("Başarıyla Yüklendi! <br><br> <a href='/'>Geri dön</a>"));
+    res.send(renderPage("Yüklendi! <br><br> <a href='/'>Geri dön</a>"));
 });
 
 app.get('/son-resim/:user', (req, res) => {
-    const filePath = path.join(uploadDir, req.params.user + '_son.jpg');
-    if (fs.existsSync(filePath)) {
+    const files = fs.readdirSync(uploadDir).filter(f => f.startsWith(req.params.user + '_')).sort();
+    if (files.length > 0) {
+        const sonDosya = files[files.length - 1];
         res.send(`
             <html><head><meta http-equiv="refresh" content="1"></head>
             <body style="margin:0; background:black; display:flex; justify-content:center; align-items:center; height:100vh;">
-                <img src="/uploads/${req.params.user + '_son.jpg'}?t=${Date.now()}" style="max-width:100%; max-height:100%; object-fit:contain;">
+                <img src="/uploads/${sonDosya}?t=${Date.now()}" style="max-width:100%; max-height:100%; object-fit:contain;">
             </body></html>
         `);
     } else {

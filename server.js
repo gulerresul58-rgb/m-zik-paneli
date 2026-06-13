@@ -7,12 +7,12 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
+// --- KULLANICILAR BURADA ---
 const kullanicilar = {
     "yayin1": "1234",
     "yayin2": "5678"
 };
 
-// Dosyaları kaydederken benzersiz olması için zaman damgası ekliyoruz
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = 'public/uploads';
@@ -32,6 +32,7 @@ const style = `<style>
     button { width: 100%; padding: 12px; background: #0095f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
 </style>`;
 
+// --- GİRİŞ VE PANEL SAYFALARI ---
 app.get('/', (req, res) => {
     res.send(`<html><head>${style}</head><body><div class="card">
         <h2>Resul Müzik Mix Panel</h2>
@@ -65,7 +66,7 @@ app.post('/upload', upload.single('resim'), (req, res) => {
         <a href="/">Panele Dön</a></div></body></html>`);
 });
 
-// OBS'in önbelleği aşması için en son yüklenen dosyaya yönlendirme
+// --- OBS İÇİN OTOMATİK YENİLEYEN SİSTEM ---
 app.get('/son-resim/:user', (req, res) => {
     const user = req.params.user;
     const dir = 'public/uploads';
@@ -76,11 +77,21 @@ app.get('/son-resim/:user', (req, res) => {
     
     if (userFiles.length > 0) {
         const sonDosya = userFiles[userFiles.length - 1];
-        // Tarayıcıya/OBS'e "bu dosyayı asla önbelleğe alma" komutu veriyoruz
-        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-        res.redirect('/uploads/' + sonDosya);
+        res.send(`
+            <html>
+            <body style="margin:0; padding:0; overflow:hidden;">
+                <img id="resim" src="/uploads/${sonDosya}" style="width:100%; height:100%; object-fit:contain;">
+                <script>
+                    setInterval(() => {
+                        const img = document.getElementById('resim');
+                        img.src = '/uploads/${sonDosya}?t=' + new Date().getTime();
+                    }, 2000);
+                </script>
+            </body>
+            </html>
+        `);
     } else {
-        res.status(404).send('Resim yok');
+        res.send('Henüz resim yüklenmemiş.');
     }
 });
 

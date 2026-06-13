@@ -1,6 +1,7 @@
 {
   "name": "m-zik-paneli",
   "version": "1.0.0",
+  "description": "Yayıncı panel sistemi",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

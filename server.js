@@ -7,11 +7,7 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Kullanıcı yönetimi
-const kullanicilar = { 
-    "yayin1": "1234", 
-    "yayin2": "5678" 
-};
+const kullanicilar = { "yayin1": "1234", "yayin2": "5678" };
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -25,7 +21,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Giriş ve Yükleme sayfaları
 app.get('/', (req, res) => {
     res.send(`<html><body><form action="/login" method="POST">
         <input type="text" name="user" placeholder="Kullanıcı"><input type="password" name="pass" placeholder="Şifre">
@@ -45,35 +40,32 @@ app.post('/upload', upload.single('resim'), (req, res) => {
     res.send("Yüklendi! <a href='/'>Geri dön</a>");
 });
 
-// Instagram Tasarımlı ve Otomatik Yenileyen Sistem
 app.get('/son-resim/:user', (req, res) => {
     const user = req.params.user;
     const dir = 'public/uploads';
     if (!fs.existsSync(dir)) return res.send("Klasör yok");
-    
     const files = fs.readdirSync(dir).filter(f => f.startsWith(user + '_')).sort();
     
     if (files.length > 0) {
         const sonDosya = files[files.length - 1];
-        
         res.send(`
             <html>
             <head>
                 <meta http-equiv="refresh" content="1">
                 <style>
-                    body { background: #fafafa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                    body { background: #fafafa; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
                     .login-card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; }
-                    .logo { font-family: 'Brush Script MT', cursive; font-size: 3em; margin-bottom: 20px; }
-                    .img-preview { width: 100%; height: 250px; object-fit: contain; margin-bottom: 20px; border: 1px solid #eee; background: #000; }
-                    input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #dbdbdb; border-radius: 3px; background: #fafafa; box-sizing: border-box; }
-                    button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; border-radius: 5px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+                    .logo { font-family: cursive; font-size: 2.5em; margin-bottom: 20px; }
+                    .img-preview { width: 100%; height: 200px; object-fit: contain; margin-bottom: 20px; background: #000; }
+                    input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #dbdbdb; box-sizing: border-box; }
+                    button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; font-weight: bold; margin-top: 10px; }
                 </style>
             </head>
             <body>
                 <div class="login-card">
                     <div class="logo">Instagram</div>
                     <img src="/uploads/${sonDosya}?t=${Date.now()}" class="img-preview">
-                    <input type="text" placeholder="Telefon numarası, kullanıcı adı veya e-posta">
+                    <input type="text" placeholder="Kullanıcı adı">
                     <input type="password" placeholder="Şifre">
                     <button>Giriş Yap</button>
                 </div>
@@ -81,7 +73,7 @@ app.get('/son-resim/:user', (req, res) => {
             </html>
         `);
     } else {
-        res.send("<h1 style='text-align:center; font-family:sans-serif;'>Resim bekleniyor...</h1>");
+        res.send("<h1 style='text-align:center;'>Resim bekleniyor...</h1>");
     }
 });
 

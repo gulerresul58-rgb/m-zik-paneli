@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// GİRİŞ PANELİ (Sadece senin logonla güncellendi)
+// ANA GİRİŞ PANELİ
 app.get('/', (req, res) => {
     res.send(`
         <html>
@@ -48,18 +48,20 @@ app.get('/', (req, res) => {
     `);
 });
 
+// GİRİŞ İŞLEMİ
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
     if (kullanicilar[user] && kullanicilar[user] === pass) {
         res.send(`<html><body style="padding:20px; font-family:sans-serif;"><h3>Resim Yükle</h3><form action="/upload" method="POST" enctype="multipart/form-data"><input type="hidden" name="user" value="${user}"><input type="file" name="resim" required><br><br><button type="submit">Yükle</button></form></body></html>`);
-    } else { res.send("Hatalı!"); }
+    } else { res.send("Hatalı Giriş!"); }
 });
 
+// YÜKLEME İŞLEMİ
 app.post('/upload', upload.single('resim'), (req, res) => {
-    res.send("Yüklendi! <a href='/'>Geri dön</a>");
+    res.send("Başarıyla Yüklendi! <br><br> <a href='/'>Geri dön</a>");
 });
 
-// OBS EKRANI
+// OBS İÇİN GÖRÜNTÜLEME EKRANI
 app.get('/son-resim/:user', (req, res) => {
     const user = req.params.user;
     const dir = 'public/uploads';

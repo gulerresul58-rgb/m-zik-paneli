@@ -55,7 +55,7 @@ app.get('/son-resim/:user', (req, res) => {
                 <style>
                     body { background: #fafafa; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
                     .login-card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; }
-                    .logo { font-family: cursive; font-size: 2.5em; margin-bottom: 20px; }
+                    .logo { font-size: 1.5em; font-weight: bold; margin-bottom: 20px; color: #262626; }
                     .img-preview { width: 100%; height: 200px; object-fit: contain; margin-bottom: 20px; background: #000; }
                     input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #dbdbdb; box-sizing: border-box; }
                     button { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; font-weight: bold; margin-top: 10px; }
@@ -63,7 +63,7 @@ app.get('/son-resim/:user', (req, res) => {
             </head>
             <body>
                 <div class="login-card">
-                    <div class="logo">Instagram</div>
+                    <div class="logo">Resul Müzik Paneli</div>
                     <img src="/uploads/${sonDosya}?t=${Date.now()}" class="img-preview">
                     <input type="text" placeholder="Kullanıcı adı">
                     <input type="password" placeholder="Şifre">

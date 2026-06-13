@@ -1,33 +1,36 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
 const app = express();
-const bodyParser = require('body-parser');
-app.use(bodyParser.urlencoded({ extended: true }));
+const upload = multer({ dest: 'public/uploads/' });
 
-// OBS'in canlı olarak izleyeceği resim linki
-let guncelResimLink = "https://i.imgur.com/yayin_baslangic.jpg"; 
+app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
 
+// Giriş Ekranı
 app.get('/', (req, res) => {
-    res.send('<h1>Giriş Yap</h1><form action="/login" method="POST"><input type="text" name="user"><input type="password" name="pass"><button>Giriş</button></form>');
+    res.send(`<h1>Giriş</h1><form action="/login" method="POST"><input type="text" name="user"><input type="password" name="pass"><button>Giriş</button></form>`);
 });
 
+// Resim Yükleme Paneli
 app.post('/login', (req, res) => {
     if(req.body.user === "yayin1" && req.body.pass === "1234") {
-        res.send(`<h1>Resim Linkini Yapıştır</h1>
-        <p>Galerinden resmi Imgur'a yükle ve linki buraya yapıştır:</p>
-        <form action="/guncelle" method="POST">
-        <input type="text" name="yeniLink" placeholder="Resim Linki">
-        <button>OBS'te Güncelle</button></form>`);
-    } else { res.send("Hatalı!"); }
+        res.send(`<h1>Resim Yükle</h1>
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="resim">
+        <button type="submit">Yükle</button></form>`);
+    } else { res.send("Hatalı giriş!"); }
 });
 
-app.post('/guncelle', (req, res) => {
-    guncelResimLink = req.body.yeniLink;
-    res.send("Resim güncellendi! OBS'te değişti.");
+// Dosyayı Kaydet
+app.post('/upload', upload.single('resim'), (req, res) => {
+    res.send("Yüklendi! Artık OBS'ten görebilirsin.");
 });
 
-// OBS bunu izliyor
+// OBS'in Çekeceği Link
 app.get('/overlay/yayin1', (req, res) => {
-    res.send(`<img src="${guncelResimLink}" style="width:100%; height:100vh; object-fit:contain;">`);
+    // Burada son yüklenen resim gösterilecek
+    res.send(`<h1>OBS Ekranı</h1><img src="/uploads/${req.file ? req.file.filename : ''}" style="width:100%;">`);
 });
 
 app.listen(10000);

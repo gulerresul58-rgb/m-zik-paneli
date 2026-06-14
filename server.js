@@ -7,7 +7,6 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// VERİLERİ DOSYAYA KAYDETME AYARI
 const dbFile = path.join(__dirname, 'veriler.json');
 let veriler = { kullanicilar: { "admin": "admin123" }, ayarlari: {} };
 
@@ -19,7 +18,6 @@ function save() { fs.writeFileSync(dbFile, JSON.stringify(veriler, null, 2)); }
 
 const upload = multer({ dest: 'public/uploads/' });
 
-// TASARIM ŞABLONU
 const layout = (content, user, isMenu = true) => `
     <html>
     <head>
@@ -68,9 +66,31 @@ app.post('/sil', (req, res) => {
 
 app.get('/panel', (req, res) => {
     const user = req.query.user;
-    if(!veriler.ayarlari[user]) veriler.ayarlari[user] = {metin:"Resul Müzik Mix Panel", renk:"#ffffff", boyut:40, konum:"bottom: 50px; left: 50px;"};
+    if(!veriler.ayarlari[user]) veriler.ayarlari[user] = {metin:"Resul Müzik Mix Panel", renk:"#ffffff", boyut:40, konum:"bottom: 50px; left: 50px;", font:"Arial"};
     const d = veriler.ayarlari[user];
-    res.send(layout(`<h3>${user} Paneli</h3><form action="/upload" method="POST" enctype="multipart/form-data"><input type="file" name="resim"><button type="submit">Yükle</button></form><form action="/update-yayin" method="POST"><input type="hidden" name="user" value="${user}"><input type="text" name="metin" value="${d.metin}"><input type="color" name="renk" value="${d.renk}"><label>Boyut: ${d.boyut}px</label><input type="range" name="boyut" min="10" max="100" value="${d.boyut}"><select name="konum"><option value="bottom: 50px; left: 50px;">Sol Alt</option><option value="top: 50px; left: 50px;">Sol Üst</option></select><button type="submit">Kaydet</button></form>`, user));
+    res.send(layout(`<h3>${user} Paneli</h3>
+        <form action="/upload" method="POST" enctype="multipart/form-data"><input type="file" name="resim"><button type="submit">Yükle</button></form>
+        <form action="/update-yayin" method="POST">
+            <input type="hidden" name="user" value="${user}">
+            <input type="text" name="metin" value="${d.metin}">
+            <input type="color" name="renk" value="${d.renk}">
+            <label>Boyut: ${d.boyut}px</label>
+            <input type="range" name="boyut" min="10" max="100" value="${d.boyut}">
+            <label>Yazı Stili:</label>
+            <select name="font">
+                <option value="Arial" ${d.font=="Arial"?"selected":""}>Arial</option>
+                <option value="Courier New" ${d.font=="Courier New"?"selected":""}>Courier New</option>
+                <option value="Georgia" ${d.font=="Georgia"?"selected":""}>Georgia</option>
+                <option value="cursive" ${d.font=="cursive"?"selected":""}>El Yazısı</option>
+                <option value="fantasy" ${d.font=="fantasy"?"selected":""}>Modern</option>
+            </select>
+            <select name="konum">
+                <option value="bottom: 50px; left: 50px;" ${d.konum.includes("bottom") && d.konum.includes("left")?"selected":""}>Sol Alt</option>
+                <option value="top: 50px; left: 50px;" ${d.konum.includes("top") && d.konum.includes("left")?"selected":""}>Sol Üst</option>
+                <option value="bottom: 50px; right: 50px;" ${d.konum.includes("bottom") && d.konum.includes("right")?"selected":""}>Sağ Alt</option>
+            </select>
+            <button type="submit">Kaydet</button>
+        </form>`, user));
 });
 
 app.post('/update-yayin', (req, res) => {
@@ -80,10 +100,9 @@ app.post('/update-yayin', (req, res) => {
 
 app.post('/upload', upload.single('resim'), (req, res) => res.redirect('/panel?user=' + req.body.user));
 
-// OBS YAYIN EKRANI
 app.get('/yayin/:user', (req, res) => {
-    const d = veriler.ayarlari[req.params.user] || { metin: "Yayında", boyut: 40, renk: "#fff", konum: "" };
-    res.send(`<body style="margin:0; background:black;"><img src="/uploads/${req.params.user}_son.jpg" style="width:100%;"><div style="position:absolute; ${d.konum} color:${d.renk}; font-size:${d.boyut}px;">${d.metin}</div></body>`);
+    const d = veriler.ayarlari[req.params.user] || { metin: "Yayında", boyut: 40, renk: "#fff", konum: "", font: "Arial" };
+    res.send(`<body style="margin:0; background:black;"><img src="/uploads/${req.params.user}_son.jpg" style="width:100%;"><div style="position:absolute; ${d.konum} color:${d.renk}; font-size:${d.boyut}px; font-family:${d.font};">${d.metin}</div></body>`);
 });
 
 app.listen(process.env.PORT || 10000);

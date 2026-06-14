@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const app = express();
 
-// --- DİZİN KONTROLÜ ---
 const uploadDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadDir)) { fs.mkdirSync(uploadDir, { recursive: true }); }
 
@@ -12,10 +11,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 const dbFile = path.join(__dirname, 'veriler.json');
-
 let veriler = { kullanicilar: { "admin": "admin123" }, ayarlari: {} };
 if (fs.existsSync(dbFile)) {
-    try { const data = fs.readFileSync(dbFile, 'utf8'); if (data) veriler = JSON.parse(data); } catch (e) { console.error("JSON okuma hatası:", e); }
+    try { const data = fs.readFileSync(dbFile, 'utf8'); if (data) veriler = JSON.parse(data); } catch (e) {}
 }
 function save() { fs.writeFileSync(dbFile, JSON.stringify(veriler, null, 2)); }
 
@@ -28,11 +26,11 @@ function getAyarlar(user) {
     return veriler.ayarlari[user];
 }
 
-const layout = (content, user, isSidebar = false) => `
+const layout = (content, user, isSidebar = false, isAdmin = false) => `
     <html>
     <head>
         <title>Resul Müzik Mix Panel</title>
-        <link href="https://fonts.googleapis.com/css2?family=Roboto&family=Pacifico&family=Lobster&family=Anton&family=Bebas+Neue&family=Press+Start+2P&family=Oswald&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Roboto&family=Pacifico&family=Lobster&family=Anton&family=Bebas+Neue&family=Oswald&display=swap" rel="stylesheet">
         <style>
             body { font-family: 'Roboto', sans-serif; margin: 0; background: #fafafa; display: flex; }
             .sidebar { width: 250px; background: #fff; height: 100vh; border-right: 1px solid #dbdbdb; padding: 20px; }
@@ -48,9 +46,10 @@ const layout = (content, user, isSidebar = false) => `
         </style>
     </head>
     <body>
-        ${isSidebar ? `<div class="sidebar"><h3>≡ RESUL MÜZİK</h3>
+        ${isSidebar ? `<div class="sidebar"><h3>≡ ${isAdmin ? 'YÖNETİM' : 'RESUL MÜZİK'}</h3>
+            ${isAdmin ? `<a class="menu-btn" href="/admin-paneli">👤 Kullanıcılar</a>` : `
             <a class="menu-btn" href="/panel?user=${user}&view=resim">🖼 Resim Yükle</a>
-            <a class="menu-btn" href="/panel?user=${user}&view=yazi">✍ Yazı Ayarları</a>
+            <a class="menu-btn" href="/panel?user=${user}&view=yazi">✍ Yazı Ayarları</a>`}
             <a href="/" style="color:red; margin-top:20px; display:block;">Çıkış Yap</a>
         </div>` : ''}
         <div class="content-area"><div class="card">${content}</div></div>
@@ -58,75 +57,81 @@ const layout = (content, user, isSidebar = false) => `
     </html>
 `;
 
+// --- ROTALAR ---
 app.get('/', (req, res) => res.send(layout(`<h3>Giriş Yap</h3><form action="/login" method="POST"><input type="text" name="user" placeholder="Kullanıcı"><input type="password" name="pass" placeholder="Şifre"><button type="submit">Giriş</button></form>`, "Giriş")));
 
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
-    if (veriler.kullanicilar[user] === pass) {
-        res.redirect(user === 'admin' ? '/admin-paneli' : '/panel?user=' + user);
-    } else { res.send("Hatalı!"); }
+    if (veriler.kullanicilar[user] === pass) res.redirect(user === 'admin' ? '/admin-paneli' : '/panel?user=' + user);
+    else res.send("Hatalı!");
 });
 
-// --- ADMIN PANELİ (EKLENDİ) ---
 app.get('/admin-paneli', (req, res) => {
     let list = Object.keys(veriler.kullanicilar).map(u => `
-        <div style="padding:10px; border-bottom:1px solid #eee;">${u}</div>`).join('');
-    res.send(layout(`<h1>Yönetim</h1><h3>Kullanıcılar:</h3>${list}<br><a href="/">Çıkış</a>`, "admin", true));
+        <div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
+            ${u} ${u !== 'admin' ? `<a href="/kisi-sil/${u}" style="color:red;">Sil</a>` : ''}
+        </div>`).join('');
+    res.send(layout(`<h1>Yönetim</h1><form action="/kisi-ekle" method="POST"><input type="text" name="yeniUser" placeholder="Kullanıcı" required><input type="text" name="yeniPass" placeholder="Şifre" required><button type="submit">Ekle</button></form><h3>Kullanıcılar:</h3>${list}`, "admin", true, true));
 });
+
+app.post('/kisi-ekle', (req, res) => { veriler.kullanicilar[req.body.yeniUser] = req.body.yeniPass; save(); res.redirect('/admin-paneli'); });
+app.get('/kisi-sil/:user', (req, res) => { delete veriler.kullanicilar[req.params.user]; save(); res.redirect('/admin-paneli'); });
 
 app.get('/panel', (req, res) => {
-    const { user, msg } = req.query;
-    if(!user) return res.redirect('/');
+    const { user, view, msg } = req.query;
     const d = getAyarlar(user);
-    const obsLink = `https://m-zik-paneli.onrender.com/yayin/${user}`;
-    let content = `
-        <div class="profile-ring"><img src="/uploads/${user}_son.jpg" onerror="this.src='https://via.placeholder.com/100'"></div>
-        ${msg ? `<div class="toast">✅ ${msg}</div>` : ''}
-        <h3>OBS Linkin:</h3><input type="text" value="${obsLink}" readonly onclick="this.select()">
-        <div id="preview-box" style="position:relative; width:100%; height:150px; background:#ddd; margin:15px 0; overflow:hidden; border-radius:8px;">
-            <img src="/uploads/${user}_son.jpg" style="width:100%; height:100%; object-fit:cover;">
-            <div id="preview-text" style="position:absolute; font-weight:bold; text-shadow:2px 2px 4px #000; color:${d.renk}; font-size:${d.boyut/2}px; font-family:${d.font}; top:${d.dikey}%; left:${d.yatay}%; transform:translate(-50%, -50%);">
-                ${d.metin}
+    let content = "";
+    
+    if (view === 'resim') {
+        content = `<h3>Resim Yükle</h3><form action="/upload" method="POST" enctype="multipart/form-data"><input type="hidden" name="user" value="${user}"><input type="file" name="resim" required><button type="submit">Yükle</button></form>`;
+    } else {
+        content = `
+            <div class="profile-ring"><img src="/uploads/${user}_son.jpg" onerror="this.src='https://via.placeholder.com/100'"></div>
+            ${msg ? `<div class="toast">✅ ${msg}</div>` : ''}
+            <h3>OBS Linkin:</h3><input type="text" value="https://m-zik-paneli.onrender.com/yayin/${user}" readonly>
+            <div id="preview-box" style="position:relative; width:100%; height:150px; background:#ddd; margin:15px 0; overflow:hidden; border-radius:8px;">
+                <img src="/uploads/${user}_son.jpg" style="width:100%; height:100%; object-fit:cover;">
+                <div id="preview-text" style="position:absolute; font-weight:bold; text-shadow:2px 2px 4px #000; color:${d.renk}; font-size:${d.boyut/2}px; font-family:${d.font}; top:${d.dikey}%; left:${d.yatay}%; transform:translate(-50%, -50%);">
+                    ${d.metin}
+                </div>
             </div>
-        </div>
-        <form action="/update-yayin" method="POST" oninput="updatePreview()">
-            <input type="hidden" name="user" value="${user}">
-            <input type="text" id="metin" name="metin" value="${d.metin}">
-            <input type="color" id="renk" name="renk" value="${d.renk}">
-            <input type="number" id="boyut" name="boyut" value="${d.boyut}">
-            <label>Dikey (%):</label><input type="range" id="dikey" name="dikey" min="0" max="100" value="${d.dikey}">
-            <label>Yatay (%):</label><input type="range" id="yatay" name="yatay" min="0" max="100" value="${d.yatay}">
-            <select name="font" id="font">
-                <option value="'Roboto', sans-serif">Modern</option>
-                <option value="'Bebas Neue', sans-serif">Manşet</option>
-                <option value="'Anton', sans-serif">Kalın</option>
-                <option value="'Pacifico', cursive">El Yazısı</option>
-            </select>
-            <button type="submit">Kaydet</button>
-        </form>
-        <script>
-            function updatePreview() {
-                const p = document.getElementById('preview-text');
-                p.innerText = document.getElementById('metin').value;
-                p.style.color = document.getElementById('renk').value;
-                p.style.fontSize = (document.getElementById('boyut').value / 2) + 'px';
-                p.style.top = document.getElementById('dikey').value + '%';
-                p.style.left = document.getElementById('yatay').value + '%';
-                p.style.fontFamily = document.getElementById('font').value;
-            }
-        </script>
-    `;
-    res.send(layout(content, user, true));
+            <form action="/update-yayin" method="POST" oninput="updatePreview()">
+                <input type="hidden" name="user" value="${user}">
+                <input type="text" id="metin" name="metin" value="${d.metin}">
+                <input type="color" id="renk" name="renk" value="${d.renk}">
+                <input type="number" id="boyut" name="boyut" value="${d.boyut}">
+                <label>Dikey (%):</label><input type="range" id="dikey" name="dikey" min="0" max="100" value="${d.dikey}">
+                <label>Yatay (%):</label><input type="range" id="yatay" name="yatay" min="0" max="100" value="${d.yatay}">
+                <select name="font" id="font">
+                    <option value="'Roboto', sans-serif" ${d.font.includes('Roboto') ? 'selected' : ''}>Modern</option>
+                    <option value="'Bebas Neue', sans-serif" ${d.font.includes('Bebas') ? 'selected' : ''}>Manşet</option>
+                    <option value="'Anton', sans-serif" ${d.font.includes('Anton') ? 'selected' : ''}>Kalın</option>
+                    <option value="'Pacifico', cursive" ${d.font.includes('Pacifico') ? 'selected' : ''}>El Yazısı</option>
+                </select>
+                <button type="submit">Kaydet</button>
+            </form>
+            <script>
+                function updatePreview() {
+                    const p = document.getElementById('preview-text');
+                    p.innerText = document.getElementById('metin').value;
+                    p.style.color = document.getElementById('renk').value;
+                    p.style.fontSize = (document.getElementById('boyut').value / 2) + 'px';
+                    p.style.top = document.getElementById('dikey').value + '%';
+                    p.style.left = document.getElementById('yatay').value + '%';
+                    p.style.fontFamily = document.getElementById('font').value;
+                }
+            </script>`;
+    }
+    res.send(layout(content, user, true, false));
 });
 
-app.post('/update-yayin', (req, res) => {
-    veriler.ayarlari[req.body.user] = req.body;
-    save(); res.redirect('/panel?user=' + req.body.user + '&msg=Başarıyla+Eklendi!');
+app.post('/upload', upload.single('resim'), (req, res) => {
+    const newPath = path.join('public/uploads/', req.body.user + '_son.jpg');
+    fs.renameSync(req.file.path, newPath);
+    res.redirect('/panel?user=' + req.body.user + '&view=yazi&msg=Resim+yüklendi!');
 });
 
-app.get('/yayin/:user', (req, res) => {
-    res.send(`<html><head><link href="https://fonts.googleapis.com/css2?family=Roboto&family=Pacifico&family=Lobster&family=Anton&family=Bebas+Neue&display=swap" rel="stylesheet"><style>body{margin:0;background:transparent;overflow:hidden;} #img{width:100%;display:block;}</style></head><body><img id="img" src="/uploads/${req.params.user}_son.jpg"><div id="yazi"></div><script>setInterval(async()=>{const res=await fetch('/api/ayarlar/${req.params.user}');const d=await res.json();const y=document.getElementById('yazi');y.innerText=d.metin;y.style.color=d.renk;y.style.fontSize=d.boyut+'px';y.style.fontFamily=d.font;y.style.position='absolute';y.style.top=d.dikey+'%';y.style.left=d.yatay+'%';y.style.transform='translate(-50%, -50%)';y.style.textShadow='2px 2px 5px #000';document.getElementById('img').src='/uploads/${req.params.user}_son.jpg?t='+new Date().getTime();},1000);</script></body></html>`);
-});
-
+app.post('/update-yayin', (req, res) => { veriler.ayarlari[req.body.user] = req.body; save(); res.redirect('/panel?user=' + req.body.user + '&msg=Kaydedildi!'); });
+app.get('/yayin/:user', (req, res) => { res.send(`<html><head><link href="https://fonts.googleapis.com/css2?family=Roboto&family=Pacifico&family=Lobster&family=Anton&family=Bebas+Neue&display=swap" rel="stylesheet"></head><body style="margin:0; background:transparent;"><img id="img" src="/uploads/${req.params.user}_son.jpg" style="width:100%"><div id="yazi"></div><script>setInterval(async()=>{const res=await fetch('/api/ayarlar/${req.params.user}');const d=await res.json();const y=document.getElementById('yazi');y.innerText=d.metin;y.style.cssText='position:absolute;font-weight:bold;text-shadow:2px 2px 4px #000;transform:translate(-50%,-50%);';y.style.color=d.renk;y.style.fontSize=d.boyut+'px';y.style.fontFamily=d.font;y.style.top=d.dikey+'%';y.style.left=d.yatay+'%';document.getElementById('img').src='/uploads/${req.params.user}_son.jpg?t='+new Date().getTime();},1000)</script></body></html>`); });
 app.get('/api/ayarlar/:user', (req, res) => res.json(getAyarlar(req.params.user)));
 app.listen(process.env.PORT || 10000);

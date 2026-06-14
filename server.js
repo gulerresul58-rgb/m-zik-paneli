@@ -19,7 +19,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 const upload = multer({ dest: 'public/uploads/' });
 
-// Baloncuk Tasarımlı Layout
 const layout = (content, user, isSidebar = false, isLogin = false, msg = "") => `
     <html>
     <head>
@@ -72,11 +71,11 @@ app.get('/panel', async (req, res) => {
     } else if (view === 'yazi') {
         content = `<h3>Yazı Ayarları</h3>
         <div id="p-box" style="width:100%; height:150px; background:#eee; position:relative; border-radius:20px; overflow:hidden; margin-bottom:20px;">
-            <div id="p-text" style="position:absolute; top:${d.dikey}%; left:${d.yatay}%; font-size:${d.boyut}px; color:${d.renk}; font-family:${d.font};">${d.metin}</div>
+            <div id="p-text" style="position:absolute; transform:translate(-50%,-50%); top:${d.dikey}%; left:${d.yatay}%; font-size:${d.boyut}px; color:${d.renk}; font-family:${d.font};">${d.metin}</div>
         </div>
         <form action="/update-yayin" method="POST" oninput="u()">
             <input type="hidden" name="user" value="${user}">
-            <input name="metin" value="${d.metin}" id="i-metin" placeholder="Yazı">
+            <input name="metin" value="${d.metin}" id="i-metin">
             <select name="font" id="i-font">
                 <option value="Arial" ${d.font=='Arial'?'selected':''}>Arial</option>
                 <option value="Impact" ${d.font=='Impact'?'selected':''}>Impact</option>
@@ -106,7 +105,14 @@ app.post('/update-yayin', async (req, res) => {
     res.redirect('/panel?user=' + req.body.user + '&msg=Ayarlar Kaydedildi');
 });
 
-app.get('/yayin/:user', (req, res) => res.send(`<html><body style="margin:0; overflow:hidden;"><img id="img" src="/uploads/${req.params.user}_son.jpg" style="position:absolute; width:100%; height:100%; object-fit:contain;"><div id="y"></div><script>setInterval(async()=>{try{const r=await fetch('/api/ayarlar/${req.params.user}');const d=await r.json();const y=document.getElementById('y');y.innerText=d.metin;y.style.cssText='position:absolute;transform:translate(-50%,-50%);font-size:'+d.boyut+'px;top:'+d.dikey+'%;left:'+d.yatay+'%;color:'+d.renk+';font-family:'+d.font+';';document.getElementById('img').src='/uploads/${req.params.user}_son.jpg?t='+Date.now();}catch(e){}},3000)</script></body></html>`));
+app.get('/yayin/:user', (req, res) => res.send(`
+    <html><body style="margin:0; overflow:hidden; background:#000;">
+    <img id="img" src="/uploads/${req.params.user}_son.jpg" style="position:absolute; width:100%; height:100%; object-fit:cover;">
+    <div id="y" style="position:absolute; transform:translate(-50%,-50%); text-shadow:2px 2px 4px #000; font-weight:bold;"></div>
+    <script>setInterval(async()=>{try{const r=await fetch('/api/ayarlar/${req.params.user}');const d=await r.json();const y=document.getElementById('y');
+    y.innerText=d.metin; y.style.fontSize=d.boyut+'px'; y.style.color=d.renk; y.style.fontFamily=d.font; y.style.top=d.dikey+'%'; y.style.left=d.yatay+'%';
+    document.getElementById('img').src='/uploads/${req.params.user}_son.jpg?t='+Date.now();}catch(e){}},3000)</script></body></html>
+`));
 
 app.get('/api/ayarlar/:user', async (req, res) => {
     const db = await getDb();

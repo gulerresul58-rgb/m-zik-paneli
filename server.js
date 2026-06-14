@@ -9,13 +9,18 @@ const uri = process.env.MONGO_URI || "mongodb+srv://resul3402:resul0234@cluster0
 const client = new MongoClient(uri);
 
 async function getDb() {
-    if (!client.topology || !client.topology.isConnected()) await client.connect();
-    const db = client.db("resul_muzik").collection("data");
-    const check = await db.findOne({ id: "veriler" });
-    if (!check) {
-        await db.insertOne({ id: "veriler", kullanicilar: { "admin": "admin123" }, ayarlari: {} });
+    try {
+        if (!client.topology || !client.topology.isConnected()) await client.connect();
+        const db = client.db("resul_muzik").collection("data");
+        const doc = await db.findOne({ id: "veriler" });
+        if (!doc) {
+            await db.insertOne({ id: "veriler", kullanicilar: { "admin": "admin123" }, ayarlari: {} });
+        }
+        return db;
+    } catch (e) {
+        console.error("DB Hatası:", e);
+        return null;
     }
-    return db;
 }
 
 const uploadDir = path.join(__dirname, 'public', 'uploads');
@@ -24,7 +29,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 const upload = multer({ dest: 'public/uploads/' });
 
-// MENÜ VE BİLDİRİM ÖZELLİKLİ LAYOUT
 const layout = (content, user, isSidebar = false, isLogin = false, msg = "") => `
     <html>
     <head>
@@ -59,63 +63,33 @@ const layout = (content, user, isSidebar = false, isLogin = false, msg = "") => 
     </html>
 `;
 
-app.get('/', (req, res) => res.send(layout(`
-    <div class="brand">Resul Müzik Mix Panel</div>
-    <form action="/login" method="POST">
-        <input name="user" placeholder="Kullanıcı Adı" required>
-        <input name="pass" type="password" placeholder="Şifre" required>
-        <button type="submit">Giriş Yap</button>
-    </form>`, "", false, true)));
+app.get('/', (req, res) => res.send(layout(`<div class="brand">Resul Müzik Mix Panel</div><form action="/login" method="POST"><input name="user" placeholder="Kullanıcı Adı" required><input name="pass" type="password" placeholder="Şifre" required><button type="submit">Giriş Yap</button></form>`, "", false, true)));
 
 app.post('/login', async (req, res) => {
     const db = await getDb();
+    if (!db) return res.send("Veritabanı hatası!");
     const doc = await db.findOne({ id: "veriler" });
     const { user, pass } = req.body;
-    if (doc.kullanicilar && doc.kullanicilar[user] === pass) res.redirect('/panel?user=' + user);
+    if (doc && doc.kullanicilar && doc.kullanicilar[user] === pass) res.redirect('/panel?user=' + user);
     else res.send("Hatalı giriş!");
 });
 
 app.get('/panel', async (req, res) => {
     const { user, view, msg } = req.query;
     const db = await getDb();
+    if (!db) return res.send("Bağlantı hatası!");
     const doc = await db.findOne({ id: "veriler" });
-    const d = (doc.ayarlari && doc.ayarlari[user]) ? doc.ayarlari[user] : { metin: "Resul Müzik", boyut: 40, font: "Arial", renk: "#ffffff", dikey: 50, yatay: 50 };
+    const d = (doc && doc.ayarlari && doc.ayarlari[user]) ? doc.ayarlari[user] : { metin: "Resul Müzik", boyut: 40, font: "Arial", renk: "#ffffff", dikey: 50, yatay: 50 };
     
-    let content = !view ? `<h2>Hoş geldin, ${user}</h2>
-        ${user === 'admin' ? `<p>OBS Linkin:<br><input type="text" value="https://${req.headers.host}/yayin/${user}" readonly onclick="this.select()"></p>` : ''}
-        <div class="story-bubble" onclick="document.getElementById('m').style.display='flex'">
-            <img src="/uploads/${user}_son.jpg" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/100'">
-        </div>
-        <div id="m" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99; justify-content:center; align-items:center;" onclick="this.style.display='none'">
-            <img src="/uploads/${user}_son.jpg" style="max-width:300px; border-radius:10px;">
-        </div>` : (view === 'yazi' ? `<h3>Yazı Ayarları</h3>
-        <div id="p-box" style="width:100%; height:150px; background:#ddd; position:relative; overflow:hidden; border-radius:8px; margin-bottom:15px;">
-            <img src="/uploads/${user}_son.jpg" style="width:100%; height:100%; object-fit:cover;">
-            <div id="p-text" style="position:absolute; top:${d.dikey}%; left:${d.yatay}%; font-size:${d.boyut/2}px; color:${d.renk}; font-family:${d.font};">${d.metin}</div>
-        </div>
-        <form action="/update-yayin" method="POST" oninput="u()">
-            <input type="hidden" name="user" value="${user}">
-            <input name="metin" value="${d.metin}" id="i-metin">
-            <input name="renk" type="color" value="${d.renk}" id="i-renk">
-            <input name="boyut" type="range" min="10" max="100" value="${d.boyut}" id="i-boyut">
-            <input name="dikey" type="range" min="0" max="100" value="${d.dikey}" id="i-dikey">
-            <input name="yatay" type="range" min="0" max="100" value="${d.yatay}" id="i-yatay">
-            <select name="font" id="i-font">
-                <option value="Arial" ${d.font=='Arial'?'selected':''}>Modern</option>
-                <option value="cursive" ${d.font=='cursive'?'selected':''}>El Yazısı</option>
-                <option value="fantasy" ${d.font=='fantasy'?'selected':''}>Manşet</option>
-            </select>
-            <button type="submit">Kaydet</button>
-        </form>
-        <script>function u(){const t=document.getElementById('p-text');t.innerText=document.getElementById('i-metin').value;t.style.color=document.getElementById('i-renk').value;t.style.fontSize=(document.getElementById('i-boyut').value/2)+'px';t.style.top=document.getElementById('i-dikey').value+'%';t.style.left=document.getElementById('i-yatay').value+'%';t.style.fontFamily=document.getElementById('i-font').value;}</script>` : `<h3>Resim Yükle</h3><form action="/upload" method="POST" enctype="multipart/form-data"><input type="hidden" name="user" value="${user}"><input type="file" name="resim"><button type="submit">Yükle</button></form>`);
+    let content = !view ? `<h2>Hoş geldin, ${user}</h2>${user === 'admin' ? `<p>OBS Linkin:<br><input type="text" value="https://${req.headers.host}/yayin/${user}" readonly onclick="this.select()"></p>` : ''}<div class="story-bubble" onclick="document.getElementById('m').style.display='flex'"><img src="/uploads/${user}_son.jpg" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/100'"></div><div id="m" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99; justify-content:center; align-items:center;" onclick="this.style.display='none'"><img src="/uploads/${user}_son.jpg" style="max-width:300px; border-radius:10px;"></div>` : (view === 'yazi' ? `<h3>Yazı Ayarları</h3><div id="p-box" style="width:100%; height:150px; background:#ddd; position:relative; overflow:hidden; border-radius:8px; margin-bottom:15px;"><img src="/uploads/${user}_son.jpg" style="width:100%; height:100%; object-fit:cover;"><div id="p-text" style="position:absolute; top:${d.dikey}%; left:${d.yatay}%; font-size:${d.boyut/2}px; color:${d.renk}; font-family:${d.font};">${d.metin}</div></div><form action="/update-yayin" method="POST" oninput="u()"><input type="hidden" name="user" value="${user}"><input name="metin" value="${d.metin}" id="i-metin"><input name="renk" type="color" value="${d.renk}" id="i-renk"><input name="boyut" type="range" min="10" max="100" value="${d.boyut}" id="i-boyut"><input name="dikey" type="range" min="0" max="100" value="${d.dikey}" id="i-dikey"><input name="yatay" type="range" min="0" max="100" value="${d.yatay}" id="i-yatay"><select name="font" id="i-font"><option value="Arial" ${d.font=='Arial'?'selected':''}>Modern</option><option value="cursive" ${d.font=='cursive'?'selected':''}>El Yazısı</option><option value="fantasy" ${d.font=='fantasy'?'selected':''}>Manşet</option></select><button type="submit">Kaydet</button></form><script>function u(){const t=document.getElementById('p-text');t.innerText=document.getElementById('i-metin').value;t.style.color=document.getElementById('i-renk').value;t.style.fontSize=(document.getElementById('i-boyut').value/2)+'px';t.style.top=document.getElementById('i-dikey').value+'%';t.style.left=document.getElementById('i-yatay').value+'%';t.style.fontFamily=document.getElementById('i-font').value;}</script>` : `<h3>Resim Yükle</h3><form action="/upload" method="POST" enctype="multipart/form-data"><input type="hidden" name="user" value="${user}"><input type="file" name="resim"><button type="submit">Yükle</button></form>`);
     res.send(layout(content, user, true, false, msg));
 });
 
-app.post('/upload', upload.single('resim'), (req, res) => { fs.renameSync(req.file.path, path.join('public/uploads/', req.body.user + '_son.jpg')); res.redirect('/panel?user=' + req.body.user + '&msg=Resim başarıyla yüklendi!'); });
+app.post('/upload', upload.single('resim'), (req, res) => { if(req.file) fs.renameSync(req.file.path, path.join('public/uploads/', req.body.user + '_son.jpg')); res.redirect('/panel?user=' + req.body.user + '&msg=Resim başarıyla yüklendi!'); });
 
 app.post('/update-yayin', async (req, res) => {
     const db = await getDb();
-    await db.updateOne({ id: "veriler" }, { $set: { [`ayarlari.${req.body.user}`]: req.body } }, { upsert: true });
+    if (db) await db.updateOne({ id: "veriler" }, { $set: { [`ayarlari.${req.body.user}`]: req.body } }, { upsert: true });
     res.redirect('/panel?user=' + req.body.user + '&msg=Ayarlar kaydedildi!');
 });
 
@@ -123,28 +97,27 @@ app.get('/yayin/:user', (req, res) => res.send(`<html><body style="margin:0; ove
 
 app.get('/api/ayarlar/:user', async (req, res) => {
     const db = await getDb();
-    const doc = await db.findOne({ id: "veriler" });
-    const d = (doc && doc.ayarlari && doc.ayarlari[req.params.user]) ? doc.ayarlari[req.params.user] : { metin: "Resul Müzik", boyut: 40, font: "Arial", renk: "#ffffff", dikey: 50, yatay: 50 };
-    res.json(d);
+    const doc = db ? await db.findOne({ id: "veriler" }) : null;
+    res.json((doc && doc.ayarlari && doc.ayarlari[req.params.user]) ? doc.ayarlari[req.params.user] : { metin: "Resul Müzik", boyut: 40, font: "Arial", renk: "#ffffff", dikey: 50, yatay: 50 });
 });
 
 app.get('/admin-paneli', async (req, res) => {
     const db = await getDb();
-    const doc = await db.findOne({ id: "veriler" });
-    const users = doc.kullanicilar || {};
+    const doc = db ? await db.findOne({ id: "veriler" }) : null;
+    const users = (doc && doc.kullanicilar) ? doc.kullanicilar : {};
     let list = Object.keys(users).map(u => `<div>${u} ${u!=='admin' ? `<a href="/kisi-sil/${u}" style="color:red;">Sil</a>` : ''}</div>`).join('');
     res.send(layout(`<h3>Kullanıcılar</h3><form action="/kisi-ekle" method="POST"><input name="yeniUser" placeholder="İsim"><input name="yeniPass" placeholder="Şifre"><button>Ekle</button></form>${list}`, "admin", true));
 });
 
 app.post('/kisi-ekle', async (req, res) => {
     const db = await getDb();
-    await db.updateOne({ id: "veriler" }, { $set: { [`kullanicilar.${req.body.yeniUser}`]: req.body.yeniPass } }, { upsert: true });
+    if (db) await db.updateOne({ id: "veriler" }, { $set: { [`kullanicilar.${req.body.yeniUser}`]: req.body.yeniPass } }, { upsert: true });
     res.redirect('/admin-paneli');
 });
 
 app.get('/kisi-sil/:user', async (req, res) => {
     const db = await getDb();
-    await db.updateOne({ id: "veriler" }, { $unset: { [`kullanicilar.${req.params.user}`]: "" } });
+    if (db) await db.updateOne({ id: "veriler" }, { $unset: { [`kullanicilar.${req.params.user}`]: "" } });
     res.redirect('/admin-paneli');
 });
 

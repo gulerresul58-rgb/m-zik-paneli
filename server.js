@@ -8,7 +8,7 @@ const app = express();
 const uri = process.env.MONGO_URI || "mongodb+srv://resul3402:resul0234@cluster0.9jn6f7f.mongodb.net/?retryWrites=true&w=majority";
 const client = new MongoClient(uri);
 
-// En kritik kısım burası: Veritabanı yoksa veya boşsa otomatik oluşturur
+// Veritabanı Bağlantısı ve İlk Kurulum (Hata almamak için)
 async function getDb() {
     if (!client.topology || !client.topology.isConnected()) await client.connect();
     const db = client.db("resul_muzik").collection("data");
@@ -65,7 +65,7 @@ app.post('/login', async (req, res) => {
     const db = await getDb();
     const doc = await db.findOne({ id: "veriler" });
     const { user, pass } = req.body;
-    if (doc.kullanicilar[user] === pass) res.redirect('/panel?user=' + user);
+    if (doc.kullanicilar && doc.kullanicilar[user] === pass) res.redirect('/panel?user=' + user);
     else res.send("Hatalı giriş!");
 });
 
@@ -113,18 +113,20 @@ app.post('/update-yayin', async (req, res) => {
     res.redirect('/panel?user=' + req.body.user);
 });
 
-app.get('/yayin/:user', (req, res) => res.send(`<html><body style="margin:0;"><div id="y"></div><script>setInterval(async()=>{const r=await fetch('/api/ayarlar/${req.params.user}');const d=await r.json();const y=document.getElementById('y');y.innerText=d.metin;y.style.cssText='position:absolute;font-size:'+d.boyut+'px;top:'+d.dikey+'%;left:'+d.yatay+'%;transform:translate(-50%,-50%);color:'+d.renk+';font-family:'+d.font;},3000)</script></body></html>`));
+app.get('/yayin/:user', (req, res) => res.send(`<html><body style="margin:0;"><div id="y"></div><script>setInterval(async()=>{try{const r=await fetch('/api/ayarlar/${req.params.user}');const d=await r.json();const y=document.getElementById('y');y.innerText=d.metin;y.style.cssText='position:absolute;font-size:'+d.boyut+'px;top:'+d.dikey+'%;left:'+d.yatay+'%;transform:translate(-50%,-50%);color:'+d.renk; }catch(e){}},3000)</script></body></html>`));
 
 app.get('/api/ayarlar/:user', async (req, res) => {
     const db = await getDb();
     const doc = await db.findOne({ id: "veriler" });
-    res.json((doc.ayarlari && doc.ayarlari[req.params.params]) ? doc.ayarlari[req.params.user] : { metin: "Resul Müzik", boyut: 40, font: "Arial", renk: "#ffffff", dikey: 50, yatay: 50 });
+    const d = (doc && doc.ayarlari && doc.ayarlari[req.params.user]) ? doc.ayarlari[req.params.user] : { metin: "Resul Müzik", boyut: 40, font: "Arial", renk: "#ffffff", dikey: 50, yatay: 50 };
+    res.json(d);
 });
 
 app.get('/admin-paneli', async (req, res) => {
     const db = await getDb();
     const doc = await db.findOne({ id: "veriler" });
-    let list = Object.keys(doc.kullanicilar).map(u => `<div>${u} ${u!=='admin' ? `<a href="/kisi-sil/${u}" style="color:red;">Sil</a>` : ''}</div>`).join('');
+    const users = doc.kullanicilar || {};
+    let list = Object.keys(users).map(u => `<div>${u} ${u!=='admin' ? `<a href="/kisi-sil/${u}" style="color:red;">Sil</a>` : ''}</div>`).join('');
     res.send(layout(`<h3>Kullanıcılar</h3><form action="/kisi-ekle" method="POST"><input name="yeniUser" placeholder="İsim"><input name="yeniPass" placeholder="Şifre"><button>Ekle</button></form>${list}`, "admin", true));
 });
 

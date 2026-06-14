@@ -11,10 +11,7 @@ const client = new MongoClient(uri);
 async function getDb() {
     try {
         if (!client.topology || !client.topology.isConnected()) await client.connect();
-        const db = client.db("resul_muzik").collection("data");
-        const doc = await db.findOne({ id: "veriler" });
-        if (!doc) await db.insertOne({ id: "veriler", kullanicilar: { "admin": "admin123" }, ayarlari: {} });
-        return db;
+        return client.db("resul_muzik").collection("data");
     } catch (e) { return null; }
 }
 
@@ -22,17 +19,17 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 const upload = multer({ dest: 'public/uploads/' });
 
+// Baloncuk Tasarımlı Layout
 const layout = (content, user, isSidebar = false, isLogin = false, msg = "") => `
     <html>
     <head>
-        <title>Resul Müzik Mix</title>
+        <title>Resul Müzik Panel</title>
         <style>
             body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f0f2f5; display: flex; ${isLogin ? 'justify-content: center; align-items: center; height: 100vh;' : ''} }
             .sidebar { width: 250px; background: #fff; height: 100vh; padding: 25px; border-right: 1px solid #ddd; }
             .content { flex: 1; padding: 40px; display: flex; justify-content: center; align-items: flex-start; }
             .card { background: white; padding: 30px; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; }
             .bubble-btn { display: block; padding: 15px; margin: 10px 0; border-radius: 50px; background: #0095f6; color: white; text-decoration: none; font-weight: bold; transition: 0.3s; }
-            .bubble-btn:hover { background: #0077c2; transform: scale(1.02); }
             input, select { width: 100%; padding: 15px; margin: 10px 0; border: 2px solid #eee; border-radius: 50px; box-sizing: border-box; outline: none; }
             button { width: 100%; padding: 15px; background: #0095f6; color: white; border: none; border-radius: 50px; font-weight: bold; cursor: pointer; }
             #toast { visibility: hidden; background: #333; color: white; padding: 15px 30px; border-radius: 50px; position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); }
@@ -41,9 +38,9 @@ const layout = (content, user, isSidebar = false, isLogin = false, msg = "") => 
     </head>
     <body>
         ${isSidebar ? `<div class="sidebar"><h3>≡ PANEL</h3>
-            ${user !== 'admin' ? `<a href="/panel?user=${user}" class="bubble-btn">🏠 Ana Sayfa</a>` : ''}
+            ${user !== 'admin' ? `<a href="/panel?user=${user}" class="bubble-btn">🏠 Ana Sayfa</a>
             <a href="/panel?user=${user}&view=resim" class="bubble-btn">🖼 Resim Yükle</a>
-            <a href="/panel?user=${user}&view=yazi" class="bubble-btn">✍ Yazı Ayarları</a>
+            <a href="/panel?user=${user}&view=yazi" class="bubble-btn">✍ Yazı Ayarları</a>` : ''}
             ${user === 'admin' ? '<a href="/admin-paneli" class="bubble-btn" style="background:#e1306c;">👤 Kullanıcı Yönetimi</a>' : ''}
             <br><a href="/" style="color:red; text-decoration:none;">Çıkış Yap</a>
         </div>` : ''}
@@ -69,13 +66,42 @@ app.get('/panel', async (req, res) => {
     const doc = await db.findOne({ id: "veriler" });
     const d = doc?.ayarlari?.[user] || { metin: "Resul Müzik", boyut: 40, renk: "#000000", dikey: 50, yatay: 50, font: "Arial" };
     
-    let content = !view ? `<h2>Hoş geldin, ${user}</h2>${user === 'admin' ? `<p>OBS Yayın Linkin:<br><input value="https://${req.headers.host}/yayin/${user}" readonly onclick="this.select()"></p>` : ''}` 
+    let content = !view ? `<h2>Hoş geldin, ${user}</h2>${user !== 'admin' ? `<p>OBS Yayın Linkin:<br><input value="https://${req.headers.host}/yayin/${user}" readonly onclick="this.select()"></p>` : ''}` 
         : (view === 'yazi' ? `<h3>Yazı Ayarları</h3><form action="/update-yayin" method="POST"><input type="hidden" name="user" value="${user}"><input name="metin" value="${d.metin}"><input name="renk" type="color" value="${d.renk}"><button type="submit">Kaydet</button></form>` 
         : `<h3>Resim Yükle</h3><form action="/upload" method="POST" enctype="multipart/form-data"><input type="hidden" name="user" value="${user}"><input type="file" name="resim"><button type="submit">Yükle</button></form>`);
     res.send(layout(content, user, true, false, msg));
 });
 
-// ... (upload, update-yayin, yayin, api-ayarlar, admin-paneli rotaları aynı şekilde kalabilir)
-// Sadece admin-paneli kısmında user !== 'admin' kontrolü ile "Ana Sayfa" butonunu kapattım.
+app.post('/upload', upload.single('resim'), (req, res) => { 
+    if(req.file) fs.renameSync(req.file.path, path.join('public/uploads/', req.body.user + '_son.jpg')); 
+    res.redirect('/panel?user=' + req.body.user + '&msg=Resim Yüklendi'); 
+});
+
+app.post('/update-yayin', async (req, res) => {
+    const db = await getDb();
+    await db.updateOne({ id: "veriler" }, { $set: { [`ayarlari.${req.body.user}`]: req.body } }, { upsert: true });
+    res.redirect('/panel?user=' + req.body.user + '&msg=Ayarlar Kaydedildi');
+});
+
+app.get('/yayin/:user', (req, res) => res.send(`<html><body style="margin:0;"><img id="img" src="/uploads/${req.params.user}_son.jpg" style="width:100%;"><div id="y"></div><script>setInterval(async()=>{try{const r=await fetch('/api/ayarlar/${req.params.user}');const d=await r.json();document.getElementById('y').innerText=d.metin;document.getElementById('img').src='/uploads/${req.params.user}_son.jpg?t='+Date.now();}catch(e){}},3000)</script></body></html>`));
+
+app.get('/api/ayarlar/:user', async (req, res) => {
+    const db = await getDb();
+    const doc = await db.findOne({ id: "veriler" });
+    res.json(doc?.ayarlari?.[req.params.user] || { metin: "Resul Müzik", boyut: 40, renk: "#ffffff" });
+});
+
+app.get('/admin-paneli', async (req, res) => {
+    const db = await getDb();
+    const doc = await db.findOne({ id: "veriler" });
+    let list = Object.keys(doc?.kullanicilar || {}).map(u => `<div>${u}</div>`).join('');
+    res.send(layout(`<h3>Kullanıcılar</h3><form action="/kisi-ekle" method="POST"><input name="yeniUser" placeholder="İsim"><input name="yeniPass" placeholder="Şifre"><button>Ekle</button></form>${list}`, "admin", true));
+});
+
+app.post('/kisi-ekle', async (req, res) => {
+    const db = await getDb();
+    await db.updateOne({ id: "veriler" }, { $set: { [`kullanicilar.${req.body.yeniUser}`]: req.body.yeniPass } }, { upsert: true });
+    res.redirect('/admin-paneli');
+});
 
 app.listen(process.env.PORT || 10000);

@@ -14,7 +14,6 @@ function save() { fs.writeFileSync(dbFile, JSON.stringify(veriler, null, 2)); }
 
 const upload = multer({ dest: 'public/uploads/' });
 
-// MODERN INSTAGRAM TARZI TASARIM
 const layout = (content, user, isSidebar = true) => `
     <html>
     <head>
@@ -41,21 +40,30 @@ const layout = (content, user, isSidebar = true) => `
 `;
 
 app.get('/panel', (req, res) => {
-    const { user, view } = req.query;
+    const { user, view, msg } = req.query;
     if(!user) return res.redirect('/');
     if(!veriler.ayarlari[user]) veriler.ayarlari[user] = {metin:"Resul Müzik", boyut:40, font:"Arial", renk:"#000", konum:"bottom: 50px; left: 50px;"};
     const d = veriler.ayarlari[user];
 
-    let content = `<h2>Merhaba ${user}</h2><p>Sol menüden bir düzenleme alanı seç.</p>`;
+    // HİKAYE BALONU VE MESAJ ALANI
+    let content = `
+        ${msg ? `<div style="background:#d4edda; color:#155724; padding:10px; border-radius:8px; margin-bottom:15px; font-size:14px;">✅ ${msg}</div>` : ''}
+        <div style="text-align:center; margin-bottom:20px;">
+            <div style="width:90px; height:90px; border-radius:50%; border:3px solid #e1306c; padding:3px; margin:0 auto;">
+                <img src="/uploads/${user}_son.jpg" onerror="this.src='https://via.placeholder.com/90'" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
+            </div>
+            <h3 style="margin-top:10px;">${user}</h3>
+        </div>
+    `;
     
     if (view === 'resim') {
-        content = `<h2>Resim Yükle</h2>
+        content += `<h2>Resim Yükle</h2>
         <form action="/upload" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="user" value="${user}">
             <input type="file" name="resim"><button type="submit">Yükle</button>
         </form>`;
     } else if (view === 'yazi') {
-        content = `<h2>Yazı Ayarları</h2>
+        content += `<h2>Yazı Ayarları</h2>
         <form action="/update-yayin" method="POST">
             <input type="hidden" name="user" value="${user}">
             <input type="text" name="metin" value="${d.metin}">
@@ -71,16 +79,29 @@ app.get('/panel', (req, res) => {
             </select>
             <button type="submit">Kaydet</button>
         </form>`;
+    } else {
+        content += `<p>Sol menüden düzenlemek istediğin alanı seçebilirsin.</p>`;
     }
     res.send(layout(content, user));
 });
 
-// Admin, Login, Upload ve Yayın rotaları önceki kodunla aynı çalışmaya devam eder.
-// (Upload işleminde dosya adını kaydeden kısmı unutma: public/uploads/${req.body.user}_son.jpg)
+// RESİM YÜKLEME VE MESAJ
+app.post('/upload', upload.single('resim'), (req, res) => {
+    const oldPath = req.file.path;
+    const newPath = path.join('public/uploads/', req.body.user + '_son.jpg');
+    fs.renameSync(oldPath, newPath);
+    res.redirect('/panel?user=' + req.body.user + '&view=resim&msg=Resminiz+başarıyla+yüklendi!');
+});
 
 app.post('/update-yayin', (req, res) => {
     veriler.ayarlari[req.body.user] = req.body;
-    save(); res.redirect('/panel?user=' + req.body.user + '&view=yazi');
+    save(); res.redirect('/panel?user=' + req.body.user + '&view=yazi&msg=Ayarlar+kaydedildi!');
+});
+
+// OBS YAYIN EKRANI (Aynı kalıyor)
+app.get('/yayin/:user', (req, res) => {
+    const d = veriler.ayarlari[req.params.user] || { metin: "Yayında", boyut: 40, renk: "#fff", font: "Arial", konum: "bottom: 50px; left: 50px;" };
+    res.send(`<body style="margin:0; background:black;"><img src="/uploads/${req.params.user}_son.jpg" style="width:100%;"><div style="position:absolute; ${d.konum} color:${d.renk}; font-size:${d.boyut}px; font-family:${d.font};">${d.metin}</div></body>`);
 });
 
 app.listen(process.env.PORT || 10000);

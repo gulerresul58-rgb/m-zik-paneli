@@ -42,7 +42,7 @@ const layout = (content, user, isSidebar = false, isLogin = false, msg = "") => 
     <body>
         ${isSidebar ? `<div class="sidebar"><h3>≡ PANEL</h3>
             ${user !== 'admin' ? `<a href="/panel?user=${user}" class="bubble-btn">🏠 Ana Sayfa</a>
-            <a href="/panel?user=${user}&view=resim" class="bubble-btn">🖼 Resim Yükle</a>
+            <a href="/panel?user=${user}&view=resim" class="bubble-btn">🖼 Resim Yönetimi</a>
             <a href="/panel?user=${user}&view=yazi" class="bubble-btn">✍ Yazı Ayarları</a>
             <a href="/panel?user=${user}&view=iletisim" class="bubble-btn" style="background:#25d366;">📞 İletişim</a>` : ''}
             ${user === 'admin' ? `
@@ -75,31 +75,24 @@ app.get('/panel', async (req, res) => {
     const d = doc?.ayarlari?.[user] || { metin: "Resul Müzik", boyut: 40, renk: "#000000", dikey: 50, yatay: 50, font: "Arial" };
     const ileti = doc?.iletisim || { wp: "", insta: "" };
     const manzaralar = doc?.manzaralar || [];
+    const kisisel = doc?.kullaniciResimleri?.[user] || [];
     
     let content = "";
     if (!view) {
-        const manzaraHtml = manzaralar.map(m => `
-            <form action="/yayina-gecir" method="POST" style="display:inline-block;">
-                <input type="hidden" name="user" value="${user}">
-                <input type="hidden" name="resimYolu" value="${m}">
-                <button type="submit" style="background:none; border:none; padding:0; cursor:pointer;">
-                    <img src="${m}" style="width:80px; height:80px; object-fit:cover; border-radius:15px; margin:5px; border:2px solid #0095f6;">
-                </button>
-            </form>
-        `).join('');
-
-        content = `<h2>Hoş geldin, ${user}</h2>
-        ${user !== 'admin' ? `
-            <p>OBS Yayın Linkin:</p>
-            <input value="https://${req.headers.host}/yayin/${user}" readonly onclick="this.select()">
-            <p>Canlı Yayın Önizlemesi:</p>
-            <div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:center;" onclick="this.style.display='none'">
-                <iframe src="/yayin/${user}" style="width:854px; height:480px; border:none; background:#000;"></iframe>
-            </div>
-            <div onclick="document.getElementById('modal').style.display='flex'" style="width:100px; height:100px; border-radius:50%; border:4px solid #0095f6; margin:20px auto; cursor:pointer; overflow:hidden; background:url('/uploads/${user}_son.jpg') center/cover;"></div>
-            <hr>
-            <p>Hazır Manzaralar:</p>
-            <div style="display:flex; flex-wrap:wrap; justify-content:center;">${manzaraHtml}</div>` : '<h3>Yönetim Paneli</h3>'}`;
+        content = `<h2>Hoş geldin, ${user}</h2><p>Sol menüden işlemlerini yönetebilirsin.</p>`;
+    } else if (view === 'resim') {
+        const galeri = (liste) => liste.map(m => `
+            <div style="display:inline-block; margin:5px; text-align:center;">
+                <img src="${m}" style="width:80px; height:80px; object-fit:cover; border-radius:10px; border:2px solid #0095f6;">
+                <form action="/yayina-gecir" method="POST"><input type="hidden" name="user" value="${user}"><input type="hidden" name="resimYolu" value="${m}"><button style="padding:5px; font-size:10px; margin-top:2px;">Yayına Al</button></form>
+            </div>`).join('');
+        content = `<h3>Resim Yükle</h3>
+        <form action="/upload-kisisel" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="user" value="${user}">
+            <input type="file" name="resim" required><button type="submit">Yükle</button>
+        </form>
+        <hr><h3>Kendi Resimlerin</h3><div style="display:flex; flex-wrap:wrap; justify-content:center;">${galeri(kisisel)}</div>
+        <hr><h3>Genel Manzaralar</h3><div style="display:flex; flex-wrap:wrap; justify-content:center;">${galeri(manzaralar)}</div>`;
     } else if (view === 'yazi') {
         content = `<h3>Yazı Ayarları</h3>
         <div id="p-box" style="width:100%; height:200px; background:#e0e0e0; position:relative; border-radius:20px; overflow:hidden; margin-bottom:20px; border:2px dashed #bbb;">
@@ -120,27 +113,24 @@ app.get('/panel', async (req, res) => {
         content = `<h3>İletişim</h3>
         <a href="https://wa.me/${ileti.wp}" class="bubble-btn" style="background:#25d366;" target="_blank">WhatsApp'a Git</a>
         <a href="https://instagram.com/${ileti.insta}" class="bubble-btn" style="background:#e1306c;" target="_blank">Instagram'a Git</a>`;
-    } else {
-        content = `<h3>Resim Yükle</h3>
-        <form action="/upload" method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="user" value="${user}">
-            <input type="file" name="resim"><button type="submit">Yükle ve Yayına Al</button>
-        </form>`;
     }
     res.send(layout(content, user, true, false, msg));
 });
 
-app.post('/upload', upload.single('resim'), (req, res) => { 
-    if(req.file) fs.renameSync(req.file.path, path.join('public/uploads/', req.body.user + '_son.jpg')); 
-    res.redirect('/panel?user=' + req.body.user + '&msg=Resim Yüklendi'); 
+app.post('/upload-kisisel', upload.single('resim'), async (req, res) => { 
+    if(req.file) {
+        const yeniYol = '/uploads/kisi_' + Date.now() + '.jpg';
+        fs.renameSync(req.file.path, path.join('public', yeniYol));
+        const db = await getDb();
+        await db.updateOne({ id: "veriler" }, { $push: { [`kullaniciResimleri.${req.body.user}`]: yeniYol } }, { upsert: true });
+    }
+    res.redirect('/panel?user=' + req.body.user + '&view=resim&msg=Resim Yüklendi'); 
 });
 
 app.post('/yayina-gecir', async (req, res) => {
     const { user, resimYolu } = req.body;
-    const kaynakYol = path.join('public', resimYolu);
-    const hedefYol = path.join('public/uploads/', user + '_son.jpg');
-    fs.copyFileSync(kaynakYol, hedefYol);
-    res.redirect('/panel?user=' + user + '&msg=Resim Yayına Alındı');
+    fs.copyFileSync(path.join('public', resimYolu), path.join('public/uploads/', user + '_son.jpg'));
+    res.redirect('/panel?user=' + user + '&view=resim&msg=Resim Yayına Alındı');
 });
 
 app.post('/update-yayin', async (req, res) => {
@@ -168,8 +158,7 @@ app.get('/yayin/:user', (req, res) => res.send(`
                     y.style.left=d.yatay+'%';
                     const img = document.getElementById('img');
                     const newSrc = '/uploads/${req.params.user}_son.jpg?t=' + new Date().getTime();
-                    if(img.src.split('?')[0] !== '/uploads/${req.params.user}_son.jpg') img.src = newSrc;
-                    else img.src = newSrc;
+                    img.src = newSrc;
                 }catch(e){}
             }, 2000)
         </script>

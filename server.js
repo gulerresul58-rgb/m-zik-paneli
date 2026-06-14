@@ -9,20 +9,21 @@ app.use(express.static('public'));
 
 const dbFile = path.join(__dirname, 'veriler.json');
 
-// GÜVENLİ VERİ OKUMA: Kullanıcıların silinmesini önler
 let veriler = { kullanicilar: { "admin": "admin123" }, ayarlari: {} };
 if (fs.existsSync(dbFile)) {
-    try {
-        veriler = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-    } catch (e) {
-        console.log("Veri dosyası hatası, varsayılanlar yüklendi.");
-    }
+    try { veriler = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {}
 }
 function save() { fs.writeFileSync(dbFile, JSON.stringify(veriler, null, 2)); }
 
 const upload = multer({ dest: 'public/uploads/' });
 
-// TASARIM ŞABLONU
+function getAyarlar(user) {
+    if (!veriler.ayarlari[user]) {
+        veriler.ayarlari[user] = { metin: "Resul Müzik", boyut: 40, font: "Arial, sans-serif", renk: "#ffffff", konum: "top: 20px;" };
+    }
+    return veriler.ayarlari[user];
+}
+
 const layout = (content, user, isSidebar = false) => `
     <html>
     <head>
@@ -36,7 +37,6 @@ const layout = (content, user, isSidebar = false) => `
             .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
             input, select, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; }
             button { background: #0095f6; color: white; font-weight: bold; cursor: pointer; border: none; }
-            .btn-del { background: #ff4757; color: white; padding: 5px 10px; border-radius: 5px; text-decoration:none; font-size: 12px;}
         </style>
     </head>
     <body>
@@ -61,9 +61,9 @@ app.post('/login', (req, res) => {
 app.get('/admin-paneli', (req, res) => {
     let list = Object.keys(veriler.kullanicilar).map(u => `
         <div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
-            ${u} ${u !== 'admin' ? `<a href="/kisi-sil/${u}" class="btn-del">Sil</a>` : ''}
+            ${u} ${u !== 'admin' ? `<a href="/kisi-sil/${u}" style="color:red; text-decoration:none;">Sil</a>` : ''}
         </div>`).join('');
-    res.send(layout(`<h1>Yönetim Paneli</h1><form action="/kisi-ekle" method="POST"><input type="text" name="yeniUser" placeholder="Kullanıcı Adı" required><input type="text" name="yeniPass" placeholder="Şifre" required><button type="submit">Ekle</button></form><h3>Kullanıcılar:</h3>${list}<br><a href="/">Çıkış Yap</a>`, "admin"));
+    res.send(layout(`<h1>Yönetim</h1><form action="/kisi-ekle" method="POST"><input type="text" name="yeniUser" placeholder="Kullanıcı" required><input type="text" name="yeniPass" placeholder="Şifre" required><button type="submit">Ekle</button></form><h3>Kullanıcılar:</h3>${list}`, "admin", true));
 });
 
 app.post('/kisi-ekle', (req, res) => {
@@ -79,43 +79,34 @@ app.get('/kisi-sil/:user', (req, res) => {
 app.get('/panel', (req, res) => {
     const { user, view, msg } = req.query;
     if(!user) return res.redirect('/');
-    if(!veriler.ayarlari[user]) veriler.ayarlari[user] = {metin:"Resul Müzik", boyut:40, font:"Arial", renk:"#000", konum:"bottom: 50px; left: 50px;"};
-    const d = veriler.ayarlari[user];
+    const d = getAyarlar(user);
     const obsLink = `https://m-zik-paneli.onrender.com/yayin/${user}`;
 
     let content = `
-        <div style="background:#f0f2f5; padding:10px; border-radius:8px; margin-bottom:20px; font-size:12px; border:1px solid #ddd;">
-            <strong>OBS Yayın Linkin:</strong><br>
-            <input type="text" value="${obsLink}" readonly onclick="this.select()" style="margin-top:5px; cursor:pointer; background:#fff;">
-        </div>
-        ${msg ? `<div style="background:#d4edda; color:#155724; padding:10px; border-radius:8px; margin-bottom:15px;">✅ ${msg}</div>` : ''}
-        <div style="text-align:center; margin-bottom:20px;">
-            <div style="width:90px; height:90px; border-radius:50%; border:3px solid #e1306c; padding:3px; margin:0 auto;">
-                <img src="/uploads/${user}_son.jpg" onerror="this.src='https://via.placeholder.com/90'" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
-            </div>
-            <h3>${user}</h3>
-        </div>
-    `;
-    
-    if (view === 'resim') {
-        content += `<h2>Resim Yükle</h2><form action="/upload" method="POST" enctype="multipart/form-data"><input type="hidden" name="user" value="${user}"><input type="file" name="resim"><button type="submit">Yükle</button></form>`;
-    } else if (view === 'yazi') {
-        content += `<h2>Yazı Ayarları</h2>
+        <h3>OBS Linkin:</h3><input type="text" value="${obsLink}" readonly onclick="this.select()">
+        ${msg ? `<p>✅ ${msg}</p>` : ''}
         <form action="/update-yayin" method="POST">
             <input type="hidden" name="user" value="${user}">
             <input type="text" name="metin" value="${d.metin}">
             <input type="color" name="renk" value="${d.renk}">
-            <input type="range" name="boyut" min="10" max="100" value="${d.boyut}">
+            <input type="number" name="boyut" value="${d.boyut}">
+            <select name="konum">
+                <option value="top: 20px;" ${d.konum.includes("top")?"selected":""}>Üstte</option>
+                <option value="bottom: 20px;" ${d.konum.includes("bottom")?"selected":""}>Altta</option>
+                <option value="top: 50%; transform: translateY(-50%);" ${d.konum.includes("50%")?"selected":""}>Ortada</option>
+            </select>
             <select name="font">
-                <option value="Arial" ${d.font=="Arial"?"selected":""}>Arial</option>
-                <option value="cursive" ${d.font=="cursive"?"selected":""}>El Yazısı</option>
-                <option value="fantasy" ${d.font=="fantasy"?"selected":""}>Modern</option>
+                <option value="Arial, sans-serif" ${d.font.includes("Arial")?"selected":""}>Arial</option>
+                <option value="'Courier New', monospace" ${d.font.includes("Courier")?"selected":""}>Kod</option>
+                <option value="'Georgia', serif" ${d.font.includes("Georgia")?"selected":""}>Klasik</option>
+                <option value="'Impact', sans-serif" ${d.font.includes("Impact")?"selected":""}>Manşet</option>
+                <option value="'Brush Script MT', cursive" ${d.font.includes("Brush")?"selected":""}>El Yazısı</option>
+                <option value="'Trebuchet MS', sans-serif" ${d.font.includes("Trebuchet")?"selected":""}>Modern</option>
+                <option value="'Verdana', sans-serif" ${d.font.includes("Verdana")?"selected":""}>Okunaklı</option>
             </select>
             <button type="submit">Kaydet</button>
-        </form>`;
-    } else {
-        content += `<p>Sol menüden bir seçenek seç.</p>`;
-    }
+        </form>
+    `;
     res.send(layout(content, user, true));
 });
 
@@ -130,29 +121,39 @@ app.post('/update-yayin', (req, res) => {
     save(); res.redirect('/panel?user=' + req.body.user + '&view=yazi&msg=Kaydedildi!');
 });
 
-// SORUNSUZ YAYIN ROTASI (Titreme ve Çizgi Yok)
 app.get('/yayin/:user', (req, res) => {
-    const d = veriler.ayarlari[req.params.user] || { metin: "Yayında", boyut: 40, renk: "#fff", font: "Arial", konum: "bottom: 50px; left: 50px;" };
     res.send(`
         <html>
         <head>
             <style>
-                body { margin: 0; padding: 0; background: black; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                body { margin: 0; background: transparent; overflow: hidden; }
                 #img { width: 100%; display: block; }
+                #yazi { position: absolute; left: 0; right: 0; text-align: center; font-weight: bold; text-shadow: 2px 2px 4px #000; }
             </style>
-            <script>
-                setInterval(() => {
-                    const img = document.getElementById('img');
-                    img.src = '/uploads/${req.params.user}_son.jpg?t=' + new Date().getTime();
-                }, 1000);
-            </script>
         </head>
         <body>
             <img id="img" src="/uploads/${req.params.user}_son.jpg">
-            <div style="position:absolute; ${d.konum} color:${d.renk}; font-size:${d.boyut}px; font-family:${d.font}; pointer-events:none;">${d.metin}</div>
+            <div id="yazi"></div>
+            <script>
+                setInterval(async () => {
+                    const res = await fetch('/api/ayarlar/${req.params.user}');
+                    const d = await res.json();
+                    const y = document.getElementById('yazi');
+                    y.innerText = d.metin;
+                    y.style.color = d.renk;
+                    y.style.fontSize = d.boyut + 'px';
+                    y.style.fontFamily = d.font;
+                    y.style.cssText = 'position: absolute; left: 0; right: 0; text-align: center; font-weight: bold; text-shadow: 2px 2px 4px #000; ' + d.konum;
+                    document.getElementById('img').src = '/uploads/${req.params.user}_son.jpg?t=' + new Date().getTime();
+                }, 1000);
+            </script>
         </body>
         </html>
     `);
+});
+
+app.get('/api/ayarlar/:user', (req, res) => {
+    res.json(getAyarlar(req.params.user));
 });
 
 app.listen(process.env.PORT || 10000);

@@ -78,8 +78,6 @@ app.get('/panel', async (req, res) => {
     const kisisel = doc?.kullaniciResimleri?.[user] || [];
     
     let content = "";
-    
-    // Resim Büyütme Scripti
     const modalHtml = `
     <div id="imgModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; justify-content:center; align-items:center;" onclick="this.style.display='none'">
         <img id="fullImg" style="max-width:90%; max-height:90%; border-radius:15px; border:2px solid #fff;">
@@ -87,14 +85,18 @@ app.get('/panel', async (req, res) => {
     <script>function buyut(src){ document.getElementById('fullImg').src = src; document.getElementById('imgModal').style.display = 'flex'; }</script>`;
 
     if (!view) {
-        content = `<h2>Hoş geldin, ${user}</h2>
-        <p>OBS Yayın Linkin:</p>
-        <input value="https://${req.headers.host}/yayin/${user}" readonly onclick="this.select()" style="cursor:pointer; text-align:center;">
-        <p>Canlı Yayın Önizlemesi:</p>
-        <div onclick="document.getElementById('modal').style.display='flex'" style="width:100px; height:100px; border-radius:50%; border:4px solid #0095f6; margin:10px auto; cursor:pointer; background:url('/uploads/${user}_son.jpg?t=${Date.now()}') center/cover;"></div>
-        <div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:center;" onclick="this.style.display='none'">
-            <iframe src="/yayin/${user}" style="width:854px; height:480px; border:none; background:#000;"></iframe>
-        </div>`;
+        if (user !== 'admin') {
+            content = `<h2>Hoş geldin, ${user}</h2>
+            <p>OBS Yayın Linkin:</p>
+            <input value="https://${req.headers.host}/yayin/${user}" readonly onclick="this.select()" style="cursor:pointer; text-align:center;">
+            <p>Canlı Yayın Önizlemesi:</p>
+            <div onclick="document.getElementById('modal').style.display='flex'" style="width:100px; height:100px; border-radius:50%; border:4px solid #0095f6; margin:10px auto; cursor:pointer; background:url('/uploads/${user}_son.jpg?t=${Date.now()}') center/cover;"></div>
+            <div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:center;" onclick="this.style.display='none'">
+                <iframe src="/yayin/${user}" style="width:854px; height:480px; border:none; background:#000;"></iframe>
+            </div>`;
+        } else {
+            content = `<h2>Hoş geldin, admin</h2><p>Sol menüden yönetim işlemlerini seçebilirsin.</p>`;
+        }
     } else if (view === 'resim') {
         const galeri = (liste) => liste.map(m => `
             <div style="display:inline-block; margin:5px; text-align:center;">

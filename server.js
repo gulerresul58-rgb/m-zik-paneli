@@ -70,8 +70,8 @@ app.get('/panel', async (req, res) => {
         content = `<h2>Hoş geldin, ${user}</h2>${user !== 'admin' ? `<p>OBS Yayın Linkin:<br><input value="https://${req.headers.host}/yayin/${user}" readonly onclick="this.select()"></p>` : '<h3>Yönetim Paneli</h3>'}`;
     } else if (view === 'yazi') {
         content = `<h3>Yazı Ayarları</h3>
-        <div id="p-box" style="width:100%; height:150px; background:#eee; position:relative; border-radius:20px; overflow:hidden; margin-bottom:20px;">
-            <div id="p-text" style="position:absolute; transform:translate(-50%,-50%); top:${d.dikey}%; left:${d.yatay}%; font-size:${d.boyut}px; color:${d.renk}; font-family:${d.font};">${d.metin}</div>
+        <div id="p-box" style="width:100%; height:200px; background:#e0e0e0; position:relative; border-radius:20px; overflow:hidden; margin-bottom:20px; border:2px dashed #bbb;">
+            <div id="p-text" style="position:absolute; transform:translate(-50%,-50%); top:${d.dikey}%; left:${d.yatay}%; font-size:${d.boyut}px; color:${d.renk}; font-family:${d.font}; white-space:nowrap; pointer-events:none;">${d.metin}</div>
         </div>
         <form action="/update-yayin" method="POST" oninput="u()">
             <input type="hidden" name="user" value="${user}">
@@ -105,6 +105,44 @@ app.post('/update-yayin', async (req, res) => {
     res.redirect('/panel?user=' + req.body.user + '&msg=Ayarlar Kaydedildi');
 });
 
-// 854x480 Çözünürlük ve Titreşimsiz Yayını
 app.get('/yayin/:user', (req, res) => res.send(`
     <html>
+    <head><style>body{margin:0;overflow:hidden;background:#000;width:854px;height:480px;} #img{position:absolute;width:854px;height:480px;object-fit:cover;z-index:1;} #y{position:absolute;z-index:2;transform:translate(-50%,-50%);text-shadow:2px 2px 4px #000;font-weight:bold;white-space:nowrap;}</style></head>
+    <body>
+        <img id="img" src="/uploads/${req.params.user}_son.jpg">
+        <div id="y"></div>
+        <script>setInterval(async()=>{try{const r=await fetch('/api/ayarlar/${req.params.user}');const d=await r.json();const y=document.getElementById('y');y.innerText=d.metin;y.style.fontSize=d.boyut+'px';y.style.color=d.renk;y.style.fontFamily=d.font;y.style.top=d.dikey+'%';y.style.left=d.yatay+'%';}catch(e){}},2000)</script>
+    </body>
+    </html>
+`));
+
+app.get('/api/ayarlar/:user', async (req, res) => {
+    const db = await getDb();
+    const doc = await db.findOne({ id: "veriler" });
+    res.json(doc?.ayarlari?.[req.params.user] || { metin: "Resul Müzik", boyut: 40, renk: "#000000", dikey: 50, yatay: 50, font: "Arial" });
+});
+
+app.get('/admin-paneli', async (req, res) => {
+    const db = await getDb();
+    const doc = await db.findOne({ id: "veriler" });
+    let list = Object.keys(doc?.kullanicilar || {}).map(u => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee;">
+            <span>${u}</span>
+            <form action="/kisi-sil" method="POST" style="margin:0;"><input type="hidden" name="user" value="${u}"><button style="background:red; border:none; color:white; padding:5px 15px; border-radius:10px; cursor:pointer;">Sil</button></form>
+        </div>`).join('');
+    res.send(layout(`<h3>Kullanıcılar</h3><form action="/kisi-ekle" method="POST"><input name="yeniUser" placeholder="İsim" required><input name="yeniPass" placeholder="Şifre" required><button>Ekle</button></form>${list}`, "admin", true));
+});
+
+app.post('/kisi-ekle', async (req, res) => {
+    const db = await getDb();
+    await db.updateOne({ id: "veriler" }, { $set: { [`kullanicilar.${req.body.yeniUser}`]: req.body.yeniPass } }, { upsert: true });
+    res.redirect('/admin-paneli');
+});
+
+app.post('/kisi-sil', async (req, res) => {
+    const db = await getDb();
+    await db.updateOne({ id: "veriler" }, { $unset: { [`kullanicilar.${req.body.user}`]: "", [`ayarlari.${req.body.user}`]: "" } });
+    res.redirect('/admin-paneli');
+});
+
+app.listen(process.env.PORT || 10000);
